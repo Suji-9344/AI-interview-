@@ -32,23 +32,28 @@ def confidence_from_face(img_array):
 
 # ---------------- VIDEO CAPTURE ----------------
 st.subheader("Record Your Video Answer (Click Start)")
-video_streamer = webrtc_streamer(key="video")
+
+webrtc_ctx = webrtc_streamer(
+    key="video",
+    mode=WebRtcMode.SENDRECV,   # allows video + audio
+    media_stream_constraints={"video": True, "audio": True},
+)
 
 # ---------------- PROCESS VIDEO ----------------
 if st.button("Evaluate Answer"):
-    if video_streamer.state.playing:
+    if webrtc_ctx.state.playing:
         st.info("Please stop recording first by clicking 'Stop' in the video window.")
-    elif video_streamer.video_receiver:
+    elif not webrtc_ctx.video_receiver:
         st.error("No video recorded. Please record your answer first.")
     else:
-        # Use a temporary file to save audio from video
-        if video_streamer.audio_frames:
+        # Process audio frames
+        audio_frames = webrtc_ctx.audio_receiver.get_frames()
+        if audio_frames:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio_file:
-                # Combine all audio frames into WAV
-                tmp_audio_file.write(b"".join(video_streamer.audio_frames))
+                for frame in audio_frames:
+                    tmp_audio_file.write(frame.to_ndarray().tobytes())
                 tmp_audio_path = tmp_audio_file.name
 
-            # Process Audio
             recognizer = sr.Recognizer()
             with sr.AudioFile(tmp_audio_path) as source:
                 audio = recognizer.record(source)
@@ -59,9 +64,12 @@ if st.button("Evaluate Answer"):
         else:
             user_text = ""
 
-        # Process Video frame for confidence
-        if video_streamer.video_frames:
-            img_array = video_streamer.video_frames[0]  # first frame
+        st.write("🗣️ Your Answer:", user_text)
+
+        # Process first video frame for confidence
+        video_frame = webrtc_ctx.video_receiver.get_frame()
+        if video_frame is not None:
+            img_array = video_frame.to_ndarray(format="rgb24")
             img = Image.fromarray(img_array)
             st.image(img, caption="Captured Frame", use_column_width=True)
         else:
@@ -71,7 +79,7 @@ if st.button("Evaluate Answer"):
         answer_score = score_answer(user_text, CORRECT_ANSWER)
         speech_conf = confidence_from_speech(user_text)
         face_conf = confidence_from_face(img_array)
-        confidence_score = round((speech_conf+face_conf)/2,2)
+        confidence_score = round((speech_conf + face_conf)/2,2)
         final_score = round((answer_score*0.7) + (confidence_score*0.3),2)
 
         # ---------- RESULTS ----------
@@ -79,4 +87,3 @@ if st.button("Evaluate Answer"):
         st.write("Answer Score:", answer_score)
         st.write("Confidence Score:", confidence_score)
         st.write("⭐ Final Score:", final_score)
-        st.write("🗣️ Your Answer:", user_text)
