@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, jsonify
+import streamlit as st
 import speech_recognition as sr
-import base64
+import numpy as np
 from PIL import Image
 import io
+import base64
 
-app = Flask(__name__)
+st.title("🎤 Smart AI Interview Practice")
 
 # Sample correct answer
 CORRECT_ANSWER = "Machine learning is a subset of artificial intelligence that enables systems to learn from data."
@@ -18,56 +19,52 @@ def score_answer(user_answer, correct_answer):
     return round(len(common_words) / len(correct_words), 2)
 
 def confidence_from_speech(text):
-    """Confidence based on length of answer (simple proxy)"""
+    """Confidence based on length of answer"""
     length_score = min(len(text.split()) / 25, 1.0)
     return round(length_score, 2)
 
 def confidence_from_face(image):
-    """Confidence based on face presence (very simple)"""
+    """Confidence based on face presence (simple)"""
     if image is not None:
         return 0.8
     else:
         return 0.4
 
-# ---------------- ROUTES ----------------
-@app.route('/')
-def index():
-    return render_template('index.html')
+# ---------------- USER INPUT ----------------
+st.subheader("Record Your Answer")
 
-@app.route('/evaluate', methods=['POST'])
-def evaluate():
-    # ---------- AUDIO ----------
-    audio_file = request.files['audio']
-    recognizer = sr.Recognizer()
+uploaded_audio = st.file_uploader("Upload your recorded audio (.wav)", type=["wav"])
+uploaded_image = st.file_uploader("Upload your webcam image (.jpg/.png)", type=["jpg","png"])
 
-    with sr.AudioFile(audio_file) as source:
-        audio = recognizer.record(source)
-        try:
-            user_text = recognizer.recognize_google(audio)
-        except:
-            user_text = ""  # fallback
+if st.button("Evaluate Answer"):
 
-    # ---------- IMAGE ----------
-    img_data = request.form['image']
-    img_bytes = base64.b64decode(img_data.split(',')[1])
-    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    if uploaded_audio is None or uploaded_image is None:
+        st.error("Please upload both audio and image")
+    else:
+        # ---------- AUDIO ----------
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(uploaded_audio) as source:
+            audio = recognizer.record(source)
+            try:
+                user_text = recognizer.recognize_google(audio)
+            except:
+                user_text = ""
 
-    # ---------- SCORING ----------
-    answer_score = score_answer(user_text, CORRECT_ANSWER)
-    speech_conf = confidence_from_speech(user_text)
-    face_conf = confidence_from_face(img)
-    confidence_score = round((speech_conf + face_conf) / 2, 2)
-    final_score = round((answer_score * 0.7) + (confidence_score * 0.3), 2)
+        st.write("🗣️ Your Answer:", user_text)
 
-    # ---------- RETURN RESULTS ----------
-    return jsonify({
-        "transcript": user_text,
-        "answer_score": answer_score,
-        "confidence_score": confidence_score,
-        "final_score": final_score
-    })
+        # ---------- IMAGE ----------
+        img = Image.open(uploaded_image).convert("RGB")
+        st.image(img, caption="Webcam Image", use_column_width=True)
 
-# ---------------- MAIN ----------------
-if __name__ == "__main__":
-    # Cloud-safe: host=0.0.0.0, port=8080, debug=False, use_reloader=False
-    app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
+        # ---------- SCORING ----------
+        answer_score = score_answer(user_text, CORRECT_ANSWER)
+        speech_conf = confidence_from_speech(user_text)
+        face_conf = confidence_from_face(img)
+        confidence_score = round((speech_conf + face_conf)/2, 2)
+        final_score = round((answer_score*0.7) + (confidence_score*0.3), 2)
+
+        # ---------- OUTPUT ----------
+        st.subheader("📊 Results")
+        st.write("Answer Score:", answer_score)
+        st.write("Confidence Score:", confidence_score)
+        st.write("⭐ Final Score:", final_score)
