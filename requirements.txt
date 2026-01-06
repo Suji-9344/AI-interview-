@@ -1,9 +1,8 @@
 flask
 speechrecognition
-opencv-python
 numpy
 fer
-mtcnn
 sentence-transformers
 torch
+pillow
 pydub
