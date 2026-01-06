@@ -1,20 +1,18 @@
 from flask import Flask, render_template, request, jsonify
 import speech_recognition as sr
-import cv2
 import base64
 import numpy as np
 from fer import FER
 from sentence_transformers import SentenceTransformer, util
+from PIL import Image
+import io
 
 app = Flask(__name__)
 
-# Load NLP model once
+# Load models
 nlp_model = SentenceTransformer("all-MiniLM-L6-v2")
-
-# Emotion detector
 emotion_detector = FER(mtcnn=True)
 
-# Sample correct answer (you can load from dataset)
 CORRECT_ANSWER = "Machine learning is a subset of artificial intelligence that enables systems to learn from data."
 
 def score_answer(user_answer, correct_answer):
@@ -28,7 +26,7 @@ def index():
 
 @app.route('/evaluate', methods=['POST'])
 def evaluate():
-    # --------- VOICE TO TEXT ----------
+    # -------- AUDIO --------
     recognizer = sr.Recognizer()
     audio_file = request.files['audio']
 
@@ -36,13 +34,11 @@ def evaluate():
         audio = recognizer.record(source)
         user_text = recognizer.recognize_google(audio)
 
-    # --------- FACE IMAGE ----------
+    # -------- IMAGE --------
     img_data = request.form['image']
     img_bytes = base64.b64decode(img_data.split(',')[1])
-    nparr = np.frombuffer(img_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
 
-    # --------- EMOTION & CONFIDENCE ----------
     emotion, emo_score = emotion_detector.top_emotion(img)
 
     confidence_map = {
@@ -56,10 +52,7 @@ def evaluate():
     }
     confidence_score = confidence_map.get(emotion, 0.5)
 
-    # --------- NLP ANSWER SCORE ----------
     answer_score = score_answer(user_text, CORRECT_ANSWER)
-
-    # --------- FINAL SCORE ----------
     final_score = (answer_score * 0.7) + (confidence_score * 0.3)
 
     return jsonify({
@@ -70,5 +63,5 @@ def evaluate():
         "final_score": round(final_score, 2)
     })
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
