@@ -2,11 +2,9 @@ import streamlit as st
 import speech_recognition as sr
 import numpy as np
 from PIL import Image
-import cv2
 import tempfile
-import time
 
-st.title("🎤 Smart AI Interview Practice with Webcam")
+st.title("🎤 Smart AI Interview Practice")
 
 # Sample question and correct answer
 QUESTION = "Explain machine learning in simple terms."
@@ -21,11 +19,12 @@ def score_answer(user_answer, correct_answer):
     return round(len(common_words) / len(correct_words), 2)
 
 def confidence_from_speech(text):
+    """Confidence based on length of answer"""
     length_score = min(len(text.split()) / 25, 1.0)
     return round(length_score, 2)
 
 def confidence_from_face(img_array):
-    # Simple rule: if face is detected, confident
+    """Simple confidence based on face presence"""
     if img_array is not None:
         return 0.8
     else:
@@ -39,13 +38,12 @@ st.write(QUESTION)
 st.subheader("Capture Your Face")
 picture = st.camera_input("Take a picture")
 
-# 2️⃣ Microphone record
+# 2️⃣ Microphone record (streamlit audio uploader)
 st.subheader("Record Your Answer")
-audio_file = st.audio_input("Click to record your answer (max 10 sec)", format="wav")
+audio_file = st.file_uploader("Upload your recorded audio (.wav)", type=["wav"])
 
 # 3️⃣ Evaluate
 if st.button("Evaluate Answer"):
-
     if picture is None or audio_file is None:
         st.error("Please capture your face and record your answer.")
     else:
@@ -68,15 +66,15 @@ if st.button("Evaluate Answer"):
         img = Image.open(picture).convert("RGB")
         st.image(img, caption="Your Captured Face", use_column_width=True)
 
-        # Convert PIL to array for face confidence
+        # Convert PIL to array
         img_array = np.array(img)
 
         # ---------- SCORING ----------
         answer_score = score_answer(user_text, CORRECT_ANSWER)
         speech_conf = confidence_from_speech(user_text)
         face_conf = confidence_from_face(img_array)
-        confidence_score = round((speech_conf + face_conf)/2, 2)
-        final_score = round((answer_score*0.7) + (confidence_score*0.3), 2)
+        confidence_score = round((speech_conf + face_conf) / 2, 2)
+        final_score = round((answer_score * 0.7) + (confidence_score * 0.3), 2)
 
         # ---------- RESULTS ----------
         st.subheader("📊 Interview Results")
