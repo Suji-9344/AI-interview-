@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AI Interview Practice</title>
+</head>
+<body>
+<h2>🎤 AI Interview Practice</h2>
+
+<button onclick="startInterview()">Start Interview</button>
+<p id="result"></p>
+
+<script>
+async function startInterview() {
+  // Voice
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+  const mediaRecorder = new MediaRecorder(stream);
+  let audioChunks = [];
+
+  mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+  mediaRecorder.start();
+
+  await new Promise(r => setTimeout(r, 5000));
+  mediaRecorder.stop();
+
+  const audioBlob = await new Promise(resolve => {
+    mediaRecorder.onstop = () => resolve(new Blob(audioChunks));
+  });
+
+  // Capture face
+  const video = document.createElement("video");
+  video.srcObject = stream;
+  await video.play();
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+  const imageData = canvas.toDataURL("image/jpeg");
+
+  stream.getTracks().forEach(track => track.stop());
+
+  const formData = new FormData();
+  formData.append("audio", audioBlob);
+  formData.append("image", imageData);
+
+  const response = await fetch("/evaluate", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await response.json();
+  document.getElementById("result").innerText =
+    `Answer: ${data.transcript}
+Emotion: ${data.emotion}
+Final Score: ${data.final_score}`;
+}
+</script>
+</body>
+</html>
