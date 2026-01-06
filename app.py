@@ -11,26 +11,19 @@ CORRECT_ANSWER = "Machine learning is a subset of artificial intelligence that e
 
 # ---------------- HELPER FUNCTIONS ----------------
 def score_answer(user_answer, correct_answer):
-    """
-    Simple scoring function without transformers:
-    Measures ratio of correct words present
-    """
+    """Simple scoring function without transformers"""
     user_words = set(user_answer.lower().split())
     correct_words = set(correct_answer.lower().split())
     common_words = user_words.intersection(correct_words)
     return round(len(common_words) / len(correct_words), 2)
 
 def confidence_from_speech(text):
-    """
-    Confidence based on length of answer (simple proxy)
-    """
+    """Confidence based on length of answer (simple proxy)"""
     length_score = min(len(text.split()) / 25, 1.0)
     return round(length_score, 2)
 
 def confidence_from_face(image):
-    """
-    Confidence based on face presence (very simple)
-    """
+    """Confidence based on face presence (very simple)"""
     if image is not None:
         return 0.8
     else:
@@ -76,4 +69,5 @@ def evaluate():
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Cloud-safe: host=0.0.0.0, port=8080, debug=False, use_reloader=False
+    app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
